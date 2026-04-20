@@ -816,9 +816,7 @@ struct CollectiveMainloopFwd {
         
         n_block--;
         constexpr int n_masking_steps = !Is_causal ? 1 : cute::ceil_div(kBlockM, kBlockN) + 1;
-        // Process additional K blocks that need causal masking (after the prefetched first block).
-        // The first-block section above already did one QK+PV gemm into tOrO_store, so every
-        // iteration here must rescale_o to merge its PV result into the running accumulator.
+        // // Only go through these if Is_causal, since n_masking_steps = 1 when !Is_causal
         CUTLASS_PRAGMA_UNROLL
         for (int masking_step = 0; masking_step < n_masking_steps - 1 && n_block >= 0; ++masking_step, --n_block) {
             Tensor tSrS = partition_fragment_C(tiled_mma_qk, select<0, 1>(TileShape_MNK{}));
@@ -860,6 +858,7 @@ struct CollectiveMainloopFwd {
             }
             pipeline_v.consumer_release(smem_pipe_read_v);
             ++smem_pipe_read_v;
+            // First block already did one QK+PV into tOrO_store; always rescale here.
             softmax_fused.rescale_o(tOrO_store, tOrO);
         }
 
