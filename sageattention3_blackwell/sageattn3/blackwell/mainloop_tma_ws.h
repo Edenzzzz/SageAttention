@@ -737,7 +737,7 @@ struct CollectiveMainloopFwd {
             Tensor tScS = thread_mma_qk.partition_C(cS);
             CUTLASS_PRAGMA_UNROLL
             for (int i = 0; i < size(tSrS); ++i) {
-                if constexpr (!Is_causal) {
+                if constexpr (!Is_causal) {  // Just masking based on col
                     if (int(get<1>(tScS(i))) >= int(unpadded_seqlen_k - n_block * kBlockN)) { tSrS(i) = -INFINITY; }
                 } else {
                     if (int(get<1>(tScS(i))) >= std::min(seqlen_k - n_block * kBlockN,
