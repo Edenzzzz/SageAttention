@@ -279,21 +279,26 @@ __global__ void scaled_fp4_quant_trans_kernel(
   constexpr uint32_t NUM_THREADS_PER_TOKEN = head_dim / CVT_FP4_ELTS_PER_THREAD;
   constexpr uint32_t NUM_THREADS_PER_SEQ = BLOCK_SIZE / CVT_FP4_ELTS_PER_THREAD;
 
-  // load input
+  // load input — permute V rows within each 32-element block so the PV MMA's
+  // K-indexed access reads the correct CLayout N-indexed values.
+  // Permutation swaps bit-fields {1,2} and {3,4} of the intra-block index.
   const int token_id = token_block_id * BLOCK_SIZE + threadIdx.x / NUM_THREADS_PER_TOKEN;
+  const int k_intra = token_id & 31;
+  const int load_token_id = (token_id & ~31)
+      | ((k_intra & 6) << 2) | ((k_intra & 24) >> 2) | (k_intra & 1);
 
   PackedVec in_vec;
-  
+
   #pragma unroll
   for (int i = 0; i < CVT_FP4_ELTS_PER_THREAD / 2; i++) {
     reinterpret_cast<uint32_t&>(in_vec.elts[i]) = 0;
   }
-  
-  if (token_id < num_tokens) {
-    in_vec = reinterpret_cast<PackedVec const*>(input + 
+
+  if (load_token_id < num_tokens) {
+    in_vec = reinterpret_cast<PackedVec const*>(input +
                                           batch_id * stride_bz_input + // batch dim
                                           head_id * stride_h_input +   // head dim
-                                          token_id * stride_seq_input + // seq dim
+                                          load_token_id * stride_seq_input + // seq dim (permuted)
                                           (threadIdx.x % NUM_THREADS_PER_TOKEN) * CVT_FP4_ELTS_PER_THREAD)[0]; // feature dim
   }
 
