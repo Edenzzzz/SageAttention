@@ -88,12 +88,10 @@ def main():
         except Exception as e:
             print(f"case failed: {e!r}"); r = []
         all_results.append(((B, H, L, D, causal), r)); print()
-    # FP4 quant: non-causal ~0.987, causal ~0.80 (early rows have sparse P).
-    # Use 0.97 for non-causal and 0.75 for causal to catch real bugs vs FP4 noise.
     bad = []
     for p, res in all_results:
         B, H, L, D, causal = p
-        thresh = 0.75 if causal else 0.97
+        thresh = 0.97
         for m in res:
             if m["cos_sim"] < thresh:
                 bad.append((p, m))
